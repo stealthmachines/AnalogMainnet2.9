@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HDGL Multi-Strand Superglyph Lattice</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#0b0b0f;color:#ffd700;font-family:monospace}
+#ui{position:absolute;top:12px;left:12px;z-index:10;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input,button{background:#111;color:#ffd700;border:1px solid #222;padding:6px;border-radius:6px}
+</style>
+</head>
+<body>
+<div id="ui">
+  <button id="toggleRec">Recursion: OFF</button>
+  <label>Particles: <input id="particleCount" type="number" value="30000" min="1000" max="500000" step="1000"></label>
+  <label>Layers: <input id="layerCount" type="number" value="8" min="1" max="128"></label>
+  <label>Zoom: <input id="zoom" type="number" step="0.01" value="0.22"></label>
+  <button id="regen">Regenerate</button>
+</div>
+<canvas id="canvas"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+// ---------- HDGL Multi-Strand ----------
+class HDGL {
+  constructor(strands=16){
+    this.recursion=false; this.time=0; this.phi=1.6180339887;
+    this.strands=strands;
+    this.strandPhases = Array.from({length:strands},(_,i)=>i*0.618);
+  }
+  toggle(){ this.recursion=!this.recursion; }
+  channels(t){
+    return this.strandPhases.map(p=>Math.sin(t*0.05+p*Math.PI*2)*(this.recursion?Math.cos(t*0.03+p*0.618):1.0));
+  }
+}
+const hdgl=new HDGL(16); // default 16 strands
+
+// ---------- Scene ----------
+const canvas=document.getElementById('canvas');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:false});
+renderer.setSize(innerWidth,innerHeight);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1e12);
+camera.position.set(0,0,300);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.06;
+
+// ---------- Particles ----------
+let particleCount=parseInt(document.getElementById('particleCount').value);
+let layerCount=parseInt(document.getElementById('layerCount').value);
+let zoom=parseFloat(document.getElementById('zoom').value);
+let positions=null;
+let particles=null;
+
+function buildParticles(count){
+  if(particles){ scene.remove(particles); particles.geometry.dispose(); particles.material.dispose(); particles=null; }
+  particleCount=Math.max(1000,Math.min(500000,count));
+  positions=new Float32Array(particleCount*3);
+  const PHI=(1+Math.sqrt(5))/2;
+  for(let i=0;i<particleCount;i++){
+    const theta=i*2*Math.PI/PHI;
+    const r=Math.sqrt(i+1); const z=(i-particleCount/2)*0.005;
+    positions[3*i]=r*Math.cos(theta); positions[3*i+1]=r*Math.sin(theta); positions[3*i+2]=z;
+  }
+  const geom=new THREE.BufferGeometry();
+  geom.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  const mat=new THREE.PointsMaterial({color:0xffd700,size:0.6,sizeAttenuation:false});
+  particles=new THREE.Points(geom,mat); scene.add(particles);
+}
+buildParticles(particleCount);
+
+// ---------- Controls ----------
+document.getElementById('toggleRec').addEventListener('click',()=>{ hdgl.toggle(); document.getElementById('toggleRec').innerText='Recursion: '+(hdgl.recursion?'ON':'OFF'); });
+document.getElementById('regen').addEventListener('click',()=>{ buildParticles(parseInt(document.getElementById('particleCount').value)); });
+document.getElementById('particleCount').addEventListener('change',(e)=>{ buildParticles(parseInt(e.target.value)); });
+document.getElementById('layerCount').addEventListener('change',(e)=>{ layerCount=parseInt(e.target.value); });
+document.getElementById('zoom').addEventListener('input',(e)=>{ zoom=parseFloat(e.target.value); });
+
+// ---------- Shader Material ----------
+const shaderMaterial=new THREE.ShaderMaterial({
+  uniforms:{
+    time:{value:0}, layers:{value:layerCount}, zoom:{value:zoom}, strands:{value:hdgl.strands}
+  },
+  vertexShader:`
+    uniform float zoom;
+    attribute vec3 position;
+    varying vec3 vPos;
+    void main(){
+      vPos=position*zoom;
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(vPos,1.0);
+      gl_PointSize=1.5;
+    }
+  `,
+  fragmentShader:`
+    uniform float time, layers, strands;
+    varying vec3 vPos;
+    void main(){
+      float colR=0.0; float colG=0.0; float colB=0.0;
+      for(float i=0.0;i<strands;i+=1.0){
+        float phase=i*0.618; float phiWave=sin(time*0.05+phase*6.2831);
+        float rec=phiWave*sin(time*0.03+phase*0.618);
+        colR+=sin(vPos.x*0.1+phase+rec);
+        colG+=sin(vPos.y*0.1+phase+rec*0.5);
+        colB+=sin(vPos.z*0.1+phase+rec*0.25);
+      }
+      colR=0.5+0.5*colR/strands; colG=0.5+0.5*colG/strands; colB=0.5+0.5*colB/strands;
+      gl_FragColor=vec4(colR,colG,colB,1.0);
+    }
+  `,
+  depthTest:false
+});
+particles.material=shaderMaterial;
+
+// ---------- Animation ----------
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);
+  t+=0.02; hdgl.time=t;
+  shaderMaterial.uniforms.time.value=t;
+  shaderMaterial.uniforms.layers.value=layerCount;
+  shaderMaterial.uniforms.zoom.value=zoom;
+  shaderMaterial.uniforms.strands.value=hdgl.strands;
+  for(let i=0;i<particleCount;i++){
+    positions[3*i]+=Math.sin(t*0.01+i*0.001)*0.002; 
+    positions[3*i+1]+=Math.cos(t*0.01+i*0.001)*0.002; 
+  }
+  particles.geometry.attributes.position.needsUpdate=true;
+  controls.update();
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>HDGL Superglyphs — Multi-Layer Ω Recursion</title>
+<style>
+html,body{margin:0;height:100%;background:#0b0b0f;overflow:hidden;font-family:monospace;color:#ffd700;}
+#ui{position:fixed;top:12px;left:12px;z-index:20;display:flex;flex-wrap:wrap;gap:8px;}
+button,input{background:#111;border:1px solid #222;color:#ffd700;padding:6px;border-radius:6px;}
+label{display:flex;align-items:center;gap:4px;}
+</style>
+</head>
+<body>
+<div id="ui">
+  <label>Focus Depth: <input id="focusDepth" type="number" value="300" min="1" max="2000" step="1"></label>
+  <label>DoF Range: <input id="dofRange" type="number" value="150" min="1" max="1000" step="1"></label>
+  <label>Recursion Layers: <input id="layers" type="number" value="4" min="1" max="16" step="1"></label>
+  <button id="regen">Regenerate</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+// ---------- HDGL Superglyph Engine ----------
+class HDGL {
+    constructor(strands=8){
+        this.strands = strands;
+        this.phi = 1.6180339887;
+        this.time = 0;
+    }
+    computeChannels(t){
+        const channels = [];
+        for(let i=0;i<this.strands;i++){
+            const r_dim = 0.3 + 0.1*i;
+            const Ω = 1/Math.pow(this.phi,i+1)**7;
+            channels.push({r_dim:r_dim, Ω:Ω, phase:t*(0.02+0.005*i)});
+        }
+        return channels;
+    }
+}
+const hdgl = new HDGL(8);
+
+// ---------- Three.js Scene ----------
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 5000);
+camera.position.set(0,0,300);
+
+const renderer = new THREE.WebGLRenderer({antialias:false});
+renderer.setPixelRatio(window.devicePixelRatio||1);
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+
+// ---------- GPU Particle System ----------
+let NUM_SLOTS = 4096;
+
+// Vertex Shader (procedural + multi-layer recursion)
+const vertexShader = `
+uniform float time;
+uniform float numSlots;
+uniform float phi;
+uniform float strandID;
+uniform float zoom;
+uniform float layerID;
+uniform float totalLayers;
+varying float vDepth;
+varying float strand;
+varying float layerAlpha;
+
+void main(){
+    float i = float(gl_VertexID);
+    float theta = i * 6.283185307 / phi + strandID*0.314159;
+    float baseR = sqrt(mod(i+1.0,numSlots))*zoom*10.0;
+    float r = baseR * (1.0 + 0.05*layerID*sin(time*0.5 + i*0.001));
+    float z = mod(i,numSlots/2.0)*0.05 - 50.0 + layerID*5.0*sin(time*0.3 + i*0.002);
+    vec3 pos = vec3(r*cos(theta + time*0.05*(layerID+1.0)), r*sin(theta + time*0.05*(layerID+1.0)), z);
+    vDepth = length(pos);
+    strand = strandID;
+    layerAlpha = 1.0 - layerID/totalLayers;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
+    gl_PointSize = 2.0 + 3.0/(0.001+vDepth/300.0) * (1.0 - layerID/totalLayers);
+}
+`;
+
+// Fragment Shader (prismatic + DoF + layered alpha)
+const fragmentShader = `
+varying float vDepth;
+varying float strand;
+varying float layerAlpha;
+uniform float focusDepth;
+uniform float dofRange;
+void main(){
+    float blur = clamp(abs(vDepth - focusDepth)/dofRange,0.0,1.0);
+    vec3 baseColor;
+    if(strand<1.0) baseColor = vec3(1.0,0.0,0.0);
+    else if(strand<2.0) baseColor = vec3(0.0,1.0,0.0);
+    else if(strand<3.0) baseColor = vec3(0.0,0.0,1.0);
+    else if(strand<4.0) baseColor = vec3(1.0,1.0,0.0);
+    else if(strand<5.0) baseColor = vec3(1.0,0.0,1.0);
+    else if(strand<6.0) baseColor = vec3(0.0,1.0,1.0);
+    else if(strand<7.0) baseColor = vec3(1.0,0.5,0.0);
+    else baseColor = vec3(0.8,0.8,1.0);
+    gl_FragColor = vec4(baseColor*(1.0-blur),layerAlpha);
+}
+`;
+
+// Geometry & material
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NUM_SLOTS*3),3));
+
+let materialTemplate = new THREE.ShaderMaterial({
+    vertexShader, fragmentShader,
+    uniforms:{
+        time:{value:0},
+        numSlots:{value:NUM_SLOTS},
+        phi:{value:1.6180339887},
+        strandID:{value:0},
+        zoom:{value:0.22},
+        focusDepth:{value:300},
+        dofRange:{value:150},
+        layerID:{value:0},
+        totalLayers:{value:4}
+    },
+    transparent:true,
+    depthTest:true,
+    blending:THREE.AdditiveBlending
+});
+
+// Multi-strand + multi-layer
+let layers = parseInt(document.getElementById('layers').value);
+let strands = [];
+function createStrands(){
+    strands.forEach(s=>scene.remove(s));
+    strands = [];
+    for(let s=0;s<hdgl.strands;s++){
+        for(let l=0;l<layers;l++){
+            const mat = materialTemplate.clone();
+            mat.uniforms.strandID.value = s;
+            mat.uniforms.layerID.value = l;
+            mat.uniforms.totalLayers.value = layers;
+            const points = new THREE.Points(geometry,mat);
+            scene.add(points);
+            strands.push(points);
+        }
+    }
+}
+createStrands();
+
+// ---------- UI ----------
+document.getElementById('regen').addEventListener('click',()=>{
+    layers = parseInt(document.getElementById('layers').value);
+    createStrands();
+});
+
+// ---------- Animation ----------
+let t=0;
+function animate(){
+    requestAnimationFrame(animate);
+    t+=0.02;
+    strands.forEach(p=>{
+        p.material.uniforms.time.value = t;
+        p.material.uniforms.focusDepth.value = parseFloat(document.getElementById('focusDepth').value);
+        p.material.uniforms.dofRange.value = parseFloat(document.getElementById('dofRange').value);
+    });
+    controls.update();
+    renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>

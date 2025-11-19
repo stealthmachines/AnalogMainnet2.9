@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HDGL Network Statistics</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; }
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>HDGL Network Statistics</h1>
+    <div class="chart-container">
+        <canvas id="phaseChart"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="consensusChart"></canvas>
+    </div>
+    <div id="stats-data">
+        <p>Evolution Count: <span id="evolution-count">Connecting...</span></p>
+        <p>Phase Variance: <span id="phase-variance">Connecting...</span></p>
+        <p>Consensus Status: <span id="consensus-status">Connecting...</span></p>
+        <p>Active Connections: <span id="active-connections">Connecting...</span></p>
+        <p>Last Update: <span id="last-update">Connecting...</span></p>
+    </div>
+
+    <script>
+        const socket = io('/stats');
+        let phaseChart, consensusChart;
+
+        // Initialize charts
+        function initCharts() {
+            const phaseCtx = document.getElementById('phaseChart').getContext('2d');
+            const consensusCtx = document.getElementById('consensusChart').getContext('2d');
+
+            phaseChart = new Chart(phaseCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Phase Variance',
+                        data: [],
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            type: 'linear',
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(8);
+                                },
+                                stepSize: 0.00000001
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Phase Variance: ' + context.parsed.y.toFixed(12);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            consensusChart = new Chart(consensusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Locked', 'Unlocked'],
+                    datasets: [{
+                        data: [0, 1],
+                        backgroundColor: [
+                            'rgb(255, 99, 132)',
+                            'rgb(54, 162, 235)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true
+                }
+            });
+        }
+
+        // Initialize charts when page loads
+        document.addEventListener('DOMContentLoaded', initCharts);
+
+        // Update stats in real-time
+        socket.on('stats_update', function(data) {
+            console.log('Stats update received:', data);
+
+            document.getElementById('evolution-count').textContent = data.evolution_count || 'N/A';
+            document.getElementById('phase-variance').textContent = data.phase_variance ? data.phase_variance.toFixed(8) : 'N/A';
+            document.getElementById('consensus-status').textContent = data.consensus_locked ? 'Locked' : 'Unlocked';
+            document.getElementById('active-connections').textContent = data.active_connections || '0';
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+
+            // Update charts with new data
+            if (phaseChart && data.phase_variance !== undefined) {
+                const now = new Date().toLocaleTimeString();
+                phaseChart.data.labels.push(now);
+                phaseChart.data.datasets[0].data.push(data.phase_variance);
+
+                // Keep only last 20 data points
+                if (phaseChart.data.labels.length > 20) {
+                    phaseChart.data.labels.shift();
+                    phaseChart.data.datasets[0].data.shift();
+                }
+                phaseChart.update('none');
+            }
+
+            if (consensusChart) {
+                consensusChart.data.datasets[0].data = data.consensus_locked ? [1, 0] : [0, 1];
+                consensusChart.update('none');
+            }
+
+            // Update page title with current evolution
+            document.title = `HDGL Stats - Evolution ${data.evolution_count || 0}`;
+        });
+
+        socket.on('connect', function() {
+            console.log('Socket.IO connected to stats!');
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Socket.IO disconnected from stats');
+            document.getElementById('evolution-count').textContent = 'Disconnected';
+            document.getElementById('phase-variance').textContent = 'Disconnected';
+            document.getElementById('consensus-status').textContent = 'Disconnected';
+        });
+    </script>
+</body>
+</html>

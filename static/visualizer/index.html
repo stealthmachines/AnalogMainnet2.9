@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌟 HDGL POT Glyph Field Visualizer 🌟</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, #0a0a0a, #1a1a2e, #16213e);
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .header {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            color: #ffd700;
+            text-shadow: 0 0 20px #ffd700;
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+
+        .controls {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .status-panel {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            min-width: 250px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .glyph-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .lattice-canvas {
+            width: 100vw;
+            height: 100vh;
+            cursor: move;
+            background: radial-gradient(circle at 50% 50%, #001122, #000000);
+        }
+
+        button {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+        }
+
+        select, input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            color: white;
+            padding: 8px;
+            border-radius: 5px;
+        }
+
+        .status-item {
+            color: #ffd700;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+
+        .phi-display {
+            text-align: center;
+            font-size: 1.2em;
+            color: #ffd700;
+            margin: 10px 0;
+            text-shadow: 0 0 10px #ffd700;
+        }
+
+        .glyph-item {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 5px;
+            border-left: 3px solid #ffd700;
+            font-size: 0.8em;
+        }
+
+        .glyph-char {
+            font-size: 1.5em;
+            color: #ffd700;
+            margin-right: 10px;
+        }
+
+        .dna-sequence {
+            font-family: monospace;
+            color: #00ff88;
+            word-break: break-all;
+            margin: 3px 0;
+        }
+
+        .gear-indicator {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">🌟 HDGL POT Glyph Field Visualizer 🌟</div>
+
+    <div class="controls">
+        <button onclick="resetView()">Reset View</button>
+        <button onclick="generateGlyphField()">Generate POT Field</button>
+        <button onclick="toggleGearMode()">Toggle Gear Connections</button>
+        <label>Glyph Count: <input type="number" id="glyphCount" value="12" min="4" max="64" onchange="generateGlyphField()"></label>
+        <label>DNA Length: <input type="number" id="dnaLength" value="16" min="8" max="64" onchange="generateGlyphField()"></label>
+    </div>
+
+    <div class="status-panel">
+        <div class="phi-display">φ ≈ 1.618033988749</div>
+        <div class="status-item">🔬 Analog Engine</div>
+        <div class="status-item">Evolution: <span id="evolution">0</span></div>
+        <div class="status-item">Phase Variance: <span id="variance">0.000000</span></div>
+        <div class="status-item">Consensus: <span id="consensus">Unlocked</span></div>
+        <div class="status-item">📜 Digital Ledger</div>
+        <div class="status-item">POA Block: <span id="poaBlock">0</span></div>
+        <div class="status-item">Tape Size: <span id="tapeSize">0</span></div>
+        <div class="status-item">🎯 Glyph Field</div>
+        <div class="status-item">Op Counter: <span id="opCounter">0</span></div>
+        <div class="status-item">Ledger Hash: <span id="ledgerHash">0</span></div>
+        <div class="status-item">Active Gears: <span id="activeGears">0</span></div>
+        <div class="status-item">Phase: <span id="phase">0.000</span></div>
+        <div class="status-item">Mode: <span id="currentMode">POT Lattice</span></div>
+    </div>
+
+    <canvas id="latticeCanvas" class="lattice-canvas"></canvas>
+
+    <div class="glyph-panel" id="glyphPanel" style="display: none;">
+        <h4>Selected Glyph Details</h4>
+        <div id="glyphDetails">Click on a glyph to see details</div>
+    </div>
+
+    <script>
+        const socket = io('/visualizer');
+
+        // POT Constants from enhanced_pot_visualizer2.html
+        const PHI = (1 + Math.sqrt(5)) / 2;
+        const INV_PHI = 1 / PHI;
+        const GOLDEN_ANGLE = 2 * Math.PI * INV_PHI;
+        const DNA_MAP = ['A', 'G', 'T', 'C'];
+
+        let opCounter = 0;
+        let ledger = 0n;
+        let animationId = null;
+        let currentGlyphs = [];
+
+        class HDGLPOTVisualizer {
+            constructor() {
+                this.canvas = document.getElementById('latticeCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.setupCanvas();
+
+                this.transform = { scale: 1, translateX: 0, translateY: 0, rotation: 0 };
+                this.animationPhase = 0;
+                this.isAnimating = true;
+                this.gearMode = false;
+                this.networkData = { nodes: [], phase_data: {} };
+                this.selectedGlyph = null;
+                this.gearConnections = new Map();
+
+                this.setupEventListeners();
+                this.generateGlyphField();
+                this.animate();
+            }            setupCanvas() {
+                this.canvas.width = window.innerWidth * devicePixelRatio;
+                this.canvas.height = window.innerHeight * devicePixelRatio;
+                this.ctx.scale(devicePixelRatio, devicePixelRatio);
+                this.canvasWidth = window.innerWidth;
+                this.canvasHeight = window.innerHeight;
+            }
+
+            setupEventListeners() {
+                let isDragging = false;
+                let lastX, lastY;
+
+                this.canvas.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+
+                    // Check for node selection
+                    const rect = this.canvas.getBoundingClientRect();
+                    const mouseX = ((e.clientX - rect.left) - this.canvasWidth/2 - this.transform.translateX) / this.transform.scale;
+                    const mouseY = ((e.clientY - rect.top) - this.canvasHeight/2 - this.transform.translateY) / this.transform.scale;
+
+                    this.selectedNode = this.findNodeAt(mouseX, mouseY);
+                    if (this.selectedNode) {
+                        this.displayNodeInfo(this.selectedNode);
+                    }
+                });
+
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (isDragging && !this.selectedNode) {
+                        const dx = (e.clientX - lastX) / this.transform.scale;
+                        const dy = (e.clientY - lastY) / this.transform.scale;
+                        this.transform.translateX += dx;
+                        this.transform.translateY += dy;
+                        lastX = e.clientX;
+                        lastY = e.clientY;
+                    }
+                });
+
+                this.canvas.addEventListener('mouseup', () => {
+                    isDragging = false;
+                    this.selectedNode = null;
+                });
+
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                    this.transform.scale *= zoomFactor;
+                    this.transform.scale = Math.max(0.1, Math.min(5, this.transform.scale));
+                });
+
+                window.addEventListener('resize', () => this.setupCanvas());
+            }            updateNetworkData(data) {
+                this.networkData = data;
+                if (data.phase_data) {
+                    document.getElementById('evolution').textContent = data.phase_data.evolution_count || 0;
+                    document.getElementById('variance').textContent = (data.phase_data.phase_variance || 0).toFixed(6);
+                    document.getElementById('phase').textContent = ((data.phase_data.phase_variance || 0) % 1).toFixed(3);
+                }
+                document.getElementById('nodeCount').textContent = (data.nodes || []).length;
+
+                // Regenerate glyphs when data changes significantly
+                if (this.glyphData.length === 0 ||
+                    Math.abs((data.phase_data?.evolution_count || 0) - this.lastEvolutionCount) > 10) {
+                    this.generateInitialGlyphs();
+                    this.lastEvolutionCount = data.phase_data?.evolution_count || 0;
+                }
+            }
+
+            // Advanced glyph generation inspired by enhanced_pot_visualizer2.html
+            async generateEphemeralDNA64(seed, opId, idx, length) {
+                const data = seed.toString() + opId + idx + "DNA64";
+                const encoder = new TextEncoder();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+                const hashArray = new Uint8Array(hashBuffer);
+
+                let dna = '';
+                for (let i = 0; dna.length < length && i < hashArray.length; i++) {
+                    const b = hashArray[i];
+                    dna += this.DNA_MAP[b & 0x03];
+                    dna += this.DNA_MAP[(b >> 2) & 0x03];
+                    dna += this.DNA_MAP[(b >> 4) & 0x03];
+                    dna += this.DNA_MAP[(b >> 6) & 0x03];
+                }
+                return dna.substring(0, length);
+            }
+
+            generateInitialGlyphs() {
+                this.glyphData = [];
+                const evolution = this.networkData.phase_data?.evolution_count || 0;
+                const variance = this.networkData.phase_data?.phase_variance || 1.123;
+
+                }
+
+            async generateGlyphField() {
+                currentGlyphs = [];
+                const glyphCount = parseInt(document.getElementById('glyphCount').value) || 12;
+                const dnaLength = parseInt(document.getElementById('dnaLength').value) || 16;
+
+                opCounter++;
+                ledger = BigInt(Date.now()) + BigInt(opCounter);
+
+                // Generate unique characters for POT glyph field
+                const chars = "∞φΦ∫∪∩≤≥∴∵∂∇∀∃∄∅∆∇⊗⊕⊙⊠⊡⊢⊣⊤⊥⋄⋅⋆⋇⋈⋉⋊⋋⋌⋍⋎⋏⋐⋑⋒⋓⋔⋕⋖⋗⋘⋙⋚⋛◊♠♣♥♦";
+
+                for (let i = 0; i < glyphCount; i++) {
+                    const char = chars[i % chars.length];
+
+                    // Compute vanishing point using golden ratio
+                    const radius = 20 * Math.sqrt(i + 0.5);
+                    const theta = i * GOLDEN_ANGLE;
+                    const x = radius * Math.cos(theta);
+                    const y = radius * Math.sin(theta);
+
+                    // Generate DNA sequence
+                    const dnaSequence = await this.generateEphemeralDNA64(ledger, opCounter, i, dnaLength);
+
+                    // Calculate phase with breathing
+                    const phase = await this.computePhaseWithBreathing(ledger, opCounter, i);
+
+                    const glyph = {
+                        char,
+                        x,
+                        y,
+                        index: i,
+                        dna: dnaSequence,
+                        phase,
+                        radius: radius,
+                        theta: theta,
+                        gear: Math.random() > 0.7 // Some glyphs have gear connections
+                    };
+
+                    currentGlyphs.push(glyph);
+                }
+
+                // Update UI
+                document.getElementById('opCounter').textContent = opCounter;
+                document.getElementById('ledgerHash').textContent = ledger.toString(16).substring(0, 8);
+                document.getElementById('activeGears').textContent = currentGlyphs.filter(g => g.gear).length;
+
+                this.generateGearConnections();
+            }
+
+            async computePhaseWithBreathing(ledger, opId, idx) {
+                const data = ledger.toString() + opId + idx;
+                const encoder = new TextEncoder();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+                const hashArray = new Uint8Array(hashBuffer);
+
+                let phase = 0.0;
+                const contraction = 0.618;
+
+                for (let i = 0; i < hashArray.length; i++) {
+                    const val = hashArray[i] / 255.0;
+                    phase = phase * contraction + val * PHI;
+                }
+
+                return (phase * INV_PHI + opId * INV_PHI + idx * INV_PHI) % (2 * Math.PI);
+            }
+
+            generateGearConnections() {
+                this.gearConnections.clear();
+
+                for (let i = 0; i < currentGlyphs.length; i++) {
+                    if (!currentGlyphs[i].gear) continue;
+
+                    for (let j = i + 1; j < currentGlyphs.length; j++) {
+                        if (!currentGlyphs[j].gear) continue;
+
+                        const dist = Math.hypot(
+                            currentGlyphs[i].x - currentGlyphs[j].x,
+                            currentGlyphs[i].y - currentGlyphs[j].y
+                        );
+
+                        // Connect nearby gears
+                        if (dist < 100) {
+                            this.gearConnections.set(`${i}-${j}`, {
+                                from: currentGlyphs[i],
+                                to: currentGlyphs[j],
+                                strength: 1 - (dist / 100)
+                            });
+                        }
+                    }
+                }
+            }
+
+            async generateEphemeralDNA64(seed, opId, idx, length) {
+                const data = seed.toString() + opId + idx + "DNA64";
+                const encoder = new TextEncoder();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+                const hashArray = new Uint8Array(hashBuffer);
+
+                let dna = '';
+                for (let i = 0; dna.length < length && i < hashArray.length; i++) {
+                    const b = hashArray[i];
+                    dna += DNA_MAP[b & 0x03];
+                    dna += DNA_MAP[(b >> 2) & 0x03];
+                    dna += DNA_MAP[(b >> 4) & 0x03];
+                    dna += DNA_MAP[(b >> 6) & 0x03];
+                }
+                return dna.substring(0, length);
+            }
+
+            handleGlyphClick(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const point = this.inverseTransformPoint(e.clientX, e.clientY);
+                const scale = 8;
+                let closestGlyph = null;
+                let minDist = Infinity;
+
+                currentGlyphs.forEach(glyph => {
+                    const x = glyph.x * scale;
+                    const y = glyph.y * scale;
+                    const dist = Math.hypot(point.x - x, point.y - y);
+                    if (dist < 15 / this.transform.scale && dist < minDist) {
+                        minDist = dist;
+                        closestGlyph = glyph;
+                    }
+                });
+
+                if (closestGlyph) {
+                    this.selectedGlyph = closestGlyph;
+                    this.displayGlyphDetails(closestGlyph);
+                }
+            }
+
+            displayGlyphDetails(glyph) {
+                const panel = document.getElementById('glyphPanel');
+                const details = document.getElementById('glyphDetails');
+
+                details.innerHTML = `
+                    <div class="glyph-item">
+                        <span class="glyph-char">${glyph.char}</span>
+                        <div>Index: ${glyph.index}</div>
+                        <div>Position: (${glyph.x.toFixed(2)}, ${glyph.y.toFixed(2)})</div>
+                        <div>Phase: ${glyph.phase.toFixed(4)}</div>
+                        <div>Radius: ${glyph.radius.toFixed(2)}</div>
+                        <div>Theta: ${(glyph.theta * 180 / Math.PI).toFixed(1)}°</div>
+                        ${glyph.gear ? '<div class="gear-indicator">⚙ GEAR ACTIVE</div>' : ''}
+                        <div class="dna-sequence">DNA: ${glyph.dna}</div>
+                    </div>
+                `;
+
+                panel.style.display = 'block';
+            }
+
+            inverseTransformPoint(x, y) {
+                const rect = this.canvas.getBoundingClientRect();
+                const canvasX = (x - rect.left) / devicePixelRatio - this.canvasWidth / 2;
+                const canvasY = (y - rect.top) / devicePixelRatio - this.canvasHeight / 2;
+                const cosR = Math.cos(-this.transform.rotation);
+                const sinR = Math.sin(-this.transform.rotation);
+                const tx = canvasX / this.transform.scale - this.transform.translateX;
+                const ty = canvasY / this.transform.scale - this.transform.translateY;
+                return {
+                    x: tx * cosR - ty * sinR,
+                    y: tx * sinR + ty * cosR
+                };
+            }
+
+            setupCanvas() {
+                this.canvas.width = window.innerWidth * devicePixelRatio;
+                this.canvas.height = window.innerHeight * devicePixelRatio;
+                this.ctx.scale(devicePixelRatio, devicePixelRatio);
+                this.canvasWidth = window.innerWidth;
+                this.canvasHeight = window.innerHeight;
+            }
+
+            setupEventListeners() {
+                let isDragging = false;
+                let lastX, lastY;
+
+                this.canvas.addEventListener('mousedown', (e) => {
+                    if (e.shiftKey) {
+                        this.handleGlyphClick(e);
+                        return;
+                    }
+
+                    isDragging = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                });
+
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const dx = (e.clientX - lastX) / this.transform.scale;
+                        const dy = (e.clientY - lastY) / this.transform.scale;
+                        this.transform.translateX += dx;
+                        this.transform.translateY += dy;
+                        lastX = e.clientX;
+                        lastY = e.clientY;
+                    }
+                });
+
+                this.canvas.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                    this.transform.scale *= zoomFactor;
+                    this.transform.scale = Math.max(0.1, Math.min(5, this.transform.scale));
+                });
+
+                window.addEventListener('resize', () => this.setupCanvas());
+            }
+
+            updateNetworkData(data) {
+                this.networkData = data;
+                if (data.phase_data) {
+                    document.getElementById('evolution').textContent = data.phase_data.evolution_count || 0;
+                    document.getElementById('phase').textContent = ((data.phase_data.phase_variance || 0) % 1).toFixed(3);
+                }
+            }
+
+            findNodeAt(x, y) {
+                // Legacy support for original network nodes
+                const tolerance = 20 / this.transform.scale;
+                return (this.networkData.nodes || []).find(node => {
+                    const dist = Math.hypot(node.x - x, node.y - y);
+                    return dist < tolerance;
+                });
+            }
+
+            render() {
+                this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+                // Apply transformations
+                this.ctx.save();
+                this.ctx.translate(this.canvasWidth / 2, this.canvasHeight / 2);
+                this.ctx.scale(this.transform.scale, this.transform.scale);
+                this.ctx.translate(this.transform.translateX, this.transform.translateY);
+                this.ctx.rotate(this.transform.rotation);
+
+                this.renderPOTGlyphField();
+                this.ctx.restore();
+            }
+
+            renderPOTGlyphField() {
+                const scale = 8;
+                const time = this.animationPhase;
+
+                // Draw glyph connections first (gear systems)
+                if (this.gearMode) {
+                    this.ctx.strokeStyle = 'rgba(255, 107, 107, 0.6)';
+                    this.ctx.lineWidth = 2;
+                    this.gearConnections.forEach(connection => {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(connection.from.x * scale, connection.from.y * scale);
+                        this.ctx.lineTo(connection.to.x * scale, connection.to.y * scale);
+                        this.ctx.globalAlpha = connection.strength;
+                        this.ctx.stroke();
+                        this.ctx.globalAlpha = 1;
+                    });
+                }
+
+                // Draw golden ratio spiral guide
+                this.ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                for (let i = 0; i < 100; i++) {
+                    const theta = i * GOLDEN_ANGLE;
+                    const r = Math.sqrt(i + 1) * 20;
+                    const x = r * Math.cos(theta) * scale;
+                    const y = r * Math.sin(theta) * scale;
+                    if (i === 0) this.ctx.moveTo(x, y);
+                    else this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
+
+                // Draw glyphs
+                currentGlyphs.forEach((glyph, index) => {
+                    const x = glyph.x * scale;
+                    const y = glyph.y * scale;
+
+                    // Breathing animation based on phase
+                    const breathe = Math.sin(time + glyph.phase) * 0.3 + 1;
+                    const size = 20 * breathe;
+
+                    // Glow effect
+                    if (glyph.gear) {
+                        this.ctx.shadowColor = '#ff6b6b';
+                        this.ctx.shadowBlur = 15;
+                    } else {
+                        this.ctx.shadowColor = '#ffd700';
+                        this.ctx.shadowBlur = 10;
+                    }
+
+                    // Draw glyph character
+                    this.ctx.fillStyle = glyph === this.selectedGlyph ? '#ffffff' : '#ffd700';
+                    this.ctx.font = `${size}px serif`;
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText(glyph.char, x, y);
+
+                    // Reset shadow
+                    this.ctx.shadowBlur = 0;
+
+                    // Draw index
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    this.ctx.font = '12px monospace';
+                    this.ctx.fillText(glyph.index.toString(), x, y + size);
+
+                    // Draw gear indicator
+                    if (glyph.gear) {
+                        this.ctx.fillStyle = '#ff6b6b';
+                        this.ctx.font = '16px sans-serif';
+                        this.ctx.fillText('⚙', x + size/2, y - size/2);
+                    }
+                });
+
+                // Draw network nodes if available
+                if (this.networkData.nodes) {
+                    this.networkData.nodes.forEach(node => {
+                        this.ctx.fillStyle = 'rgba(0, 255, 136, 0.8)';
+                        this.ctx.beginPath();
+                        this.ctx.arc(node.x, node.y, 3, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                    });
+                }
+            }
+
+            animate() {
+                if (this.isAnimating) {
+                    this.animationPhase += 0.02;
+                }
+
+                this.render();
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // Initialize the visualizer
+        const visualizer = new HDGLPOTVisualizer();
+
+        // Socket.IO event handlers
+        socket.on('connect', function() {
+            console.log('Visualizer connected to /visualizer namespace');
+        });
+
+        socket.on('network_update', function(data) {
+            console.log('Network update received:', data);
+            visualizer.updateNetworkData(data);
+        });
+
+        socket.on('phase_update', function(data) {
+            console.log('Phase update received:', data);
+            visualizer.updateNetworkData({ phase_data: data });
+
+            // Update analog engine display
+            if (data.evolution_count !== undefined) {
+                document.getElementById('evolution').textContent = data.evolution_count;
+            }
+            if (data.phase_variance !== undefined) {
+                document.getElementById('variance').textContent = data.phase_variance.toFixed(6);
+                document.getElementById('phase').textContent = (data.phase_variance % 1).toFixed(3);
+            }
+            if (data.consensus_locked !== undefined) {
+                document.getElementById('consensus').textContent = data.consensus_locked ? 'Locked' : 'Unlocked';
+            }
+        });
+
+        // Listen for tape updates from program interface
+        socket.on('tape_status', function(data) {
+            console.log('Tape status received:', data);
+            document.getElementById('tapeSize').textContent = data.size || 0;
+
+            // Regenerate glyph field when tape changes
+            if (data.size > 0) {
+                generateGlyphField();
+            }
+        });
+
+        // Listen for program actions to update visualizer
+        socket.on('program_action', function(data) {
+            console.log('Program action received:', data);
+
+            // Update status based on program activity
+            const action = data.action || 'Unknown action';
+            document.getElementById('currentMode').textContent =
+                `POT Lattice (${action})`;
+
+            // Flash effect for visual feedback
+            const statusPanel = document.querySelector('.status-panel');
+            statusPanel.style.border = '2px solid #00ff88';
+            setTimeout(() => {
+                statusPanel.style.border = '1px solid rgba(255, 215, 0, 0.5)';
+            }, 1000);
+        });
+
+        // Check POA network status periodically
+        setInterval(async function() {
+            try {
+                const response = await fetch('http://localhost:8555', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'eth_blockNumber',
+                        params: [],
+                        id: 1
+                    })
+                });
+                const data = await response.json();
+                if (data.result) {
+                    const blockNum = parseInt(data.result, 16);
+                    document.getElementById('poaBlock').textContent = blockNum;
+                }
+            } catch (error) {
+                console.log('POA network check failed:', error);
+                document.getElementById('poaBlock').textContent = 'Offline';
+            }
+        }, 5000); // Check every 5 seconds
+
+        // Global functions for UI
+        function resetView() {
+            visualizer.transform = { scale: 1, translateX: 0, translateY: 0, rotation: 0 };
+        }
+
+        function generateGlyphField() {
+            visualizer.generateGlyphField();
+        }
+
+        function toggleGearMode() {
+            visualizer.gearMode = !visualizer.gearMode;
+            document.getElementById('currentMode').textContent =
+                visualizer.gearMode ? 'POT Lattice + Gears' : 'POT Lattice';
+        }
+
+        function toggleAnimation() {
+            visualizer.isAnimating = !visualizer.isAnimating;
+        }
+
+        // Initialize with some glyphs
+        generateGlyphField();
+
+    </script>
+</body>
+</html>
+                    case 'orbital':
+                        this.renderOrbitalMechanics();
+                        break;
+                    case 'breathing':
+                        this.renderBreathingField();
+                        break;
+                }
+
+                this.ctx.restore();
+            }
+
+            renderLatticeNetwork() {
+                const centerX = 0, centerY = 0;
+                const evolution = this.networkData.phase_data?.evolution_count || 0;
+                const variance = this.networkData.phase_data?.phase_variance || 1.123;
+
+                // Draw central hub with breathing effect
+                const hubRadius = 15 + 5 * Math.sin(this.animationPhase * 0.618);
+                const hubColor = this.networkData.phase_data?.consensus_locked ? '#00ff88' : '#ff6b6b';
+
+                this.ctx.fillStyle = hubColor;
+                this.ctx.strokeStyle = '#ffd700';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, hubRadius, 0, 2 * Math.PI);
+                this.ctx.fill();
+                this.ctx.stroke();
+
+                // Render advanced glyphs with DNA and ternary systems
+                this.glyphData.forEach((glyph, i) => {
+                    // Update glyph position with breathing
+                    const breathingFactor = 1 + 0.2 * Math.sin(this.animationPhase * 0.5 + glyph.phase);
+                    const glyphX = glyph.x * breathingFactor;
+                    const glyphY = glyph.y * breathingFactor;
+
+                    // Ternary-based color selection
+                    let glyphColor;
+                    switch (glyph.ternary) {
+                        case -1: glyphColor = '#ff4757'; break; // Red
+                        case 0:  glyphColor = '#2ed573'; break; // Green
+                        case 1:  glyphColor = '#3742fa'; break; // Blue
+                        default: glyphColor = '#ffd700'; break; // Gold
+                    }
+
+                    // Glyph radius based on energy and breathing
+                    const glyphRadius = (5 + glyph.energy * 2) * breathingFactor;
+
+                    // Draw connection to center with DNA-influenced opacity
+                    const dnaInfluence = glyph.dna64.length > 0 ?
+                        (glyph.dna64.charCodeAt(0) % 100) / 100 : 0.5;
+                    this.ctx.strokeStyle = `${glyphColor}${Math.floor(dnaInfluence * 255).toString(16).padStart(2, '0')}`;
+                    this.ctx.lineWidth = 1 + dnaInfluence;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(centerX, centerY);
+                    this.ctx.lineTo(glyphX, glyphY);
+                    this.ctx.stroke();
+
+                    // Draw main glyph with selection highlighting
+                    if (glyph.selected) {
+                        // Selection highlight
+                        this.ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+                        this.ctx.strokeStyle = '#ffd700';
+                        this.ctx.lineWidth = 3;
+                        this.ctx.beginPath();
+                        this.ctx.arc(glyphX, glyphY, glyphRadius * 1.5, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                        this.ctx.stroke();
+                    }
+
+                    // Main glyph body
+                    this.ctx.fillStyle = glyphColor;
+                    this.ctx.beginPath();
+                    this.ctx.arc(glyphX, glyphY, glyphRadius, 0, 2 * Math.PI);
+                    this.ctx.fill();
+
+                    // DNA pattern overlay - draw nucleotide dots
+                    if (glyph.dna64.length > 0) {
+                        const nucleotides = glyph.dna64.substring(0, 8);
+                        for (let n = 0; n < nucleotides.length; n++) {
+                            const nucleotide = nucleotides[n];
+                            const dotAngle = (n / nucleotides.length) * 2 * Math.PI;
+                            const dotRadius = glyphRadius * 0.7;
+                            const dotX = glyphX + Math.cos(dotAngle) * dotRadius;
+                            const dotY = glyphY + Math.sin(dotAngle) * dotRadius;
+
+                            // DNA color coding
+                            let nucleotideColor;
+                            switch (nucleotide) {
+                                case 'A': nucleotideColor = '#ff6b35'; break; // Adenine - Orange
+                                case 'T': nucleotideColor = '#3742fa'; break; // Thymine - Blue
+                                case 'G': nucleotideColor = '#2ed573'; break; // Guanine - Green
+                                case 'C': nucleotideColor = '#ff3838'; break; // Cytosine - Red
+                                default:  nucleotideColor = '#ffffff'; break;
+                            }
+
+                            this.ctx.fillStyle = nucleotideColor;
+                            this.ctx.beginPath();
+                            this.ctx.arc(dotX, dotY, 2, 0, 2 * Math.PI);
+                            this.ctx.fill();
+                        }
+                    }
+
+                    // Ternary state indicator
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.font = '12px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(glyph.ternary.toString(), glyphX, glyphY + 4);
+
+                    // Glow effect
+                    const gradient = this.ctx.createRadialGradient(glyphX, glyphY, 0, glyphX, glyphY, glyphRadius * 3);
+                    gradient.addColorStop(0, `${glyphColor}44`);
+                    gradient.addColorStop(1, 'transparent');
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.beginPath();
+                    this.ctx.arc(glyphX, glyphY, glyphRadius * 3, 0, 2 * Math.PI);
+                    this.ctx.fill();
+                });
+            }
+
+            renderOrbitalMechanics() {
+                const nodes = this.networkData.nodes || [];
+                const evolution = this.networkData.phase_data?.evolution_count || 0;
+                const variance = this.networkData.phase_data?.phase_variance || 1.123;
+
+                // Multiple orbital rings
+                const rings = 5;
+                for (let ring = 0; ring < rings; ring++) {
+                    const ringRadius = 50 + ring * 40;
+                    const nodesInRing = Math.max(1, Math.floor(nodes.length / rings));
+                    const ringSpeed = (ring + 1) * 0.005 * (variance - 1);
+
+                    for (let n = 0; n < nodesInRing && ring * nodesInRing + n < nodes.length; n++) {
+                        const angle = (n / nodesInRing) * 2 * Math.PI + this.animationPhase * ringSpeed;
+                        const x = Math.cos(angle) * ringRadius;
+                        const y = Math.sin(angle) * ringRadius;
+
+                        const nodeIndex = ring * nodesInRing + n;
+                        const nodeRadius = 3 + (nodeIndex % 5);
+                        const orbitalBreathe = 1 + 0.2 * Math.sin(this.animationPhase + nodeIndex);
+
+                        // Draw orbital trail
+                        this.ctx.strokeStyle = `hsl(${ring * 60 + 30}, 50%, 40%)`;
+                        this.ctx.lineWidth = 0.5;
+                        this.ctx.beginPath();
+                        this.ctx.arc(0, 0, ringRadius, 0, 2 * Math.PI);
+                        this.ctx.stroke();
+
+                        // Draw orbiting node
+                        this.ctx.fillStyle = `hsl(${ring * 60 + 30}, 70%, 60%)`;
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, nodeRadius * orbitalBreathe, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                    }
+                }
+            }
+
+            renderBreathingField() {
+                const nodes = this.networkData.nodes || [];
+                const variance = this.networkData.phase_data?.phase_variance || 1.123;
+
+                // Global breathing rhythm
+                const globalBreathe = 1 + 0.4 * Math.sin(this.animationPhase * 0.618);
+
+                // Create breathing hexagonal grid
+                const gridSize = 40;
+                const rows = 15;
+                const cols = 20;
+
+                for (let row = -rows/2; row < rows/2; row++) {
+                    for (let col = -cols/2; col < cols/2; col++) {
+                        const x = col * gridSize + (row % 2) * (gridSize/2);
+                        const y = row * gridSize * 0.866; // hexagonal spacing
+
+                        const distance = Math.sqrt(x*x + y*y);
+                        const wave = Math.sin(distance * 0.01 - this.animationPhase * 0.1);
+                        const localBreathe = globalBreathe * (1 + 0.3 * wave);
+
+                        const cellRadius = 8 * localBreathe;
+                        const intensity = Math.max(0, 1 - distance / 400);
+
+                        if (intensity > 0) {
+                            // Breathing cell with variance-influenced color
+                            const hue = (variance * 100 + wave * 30) % 360;
+                            this.ctx.fillStyle = `hsla(${hue}, 60%, 50%, ${intensity * 0.6})`;
+                            this.ctx.beginPath();
+                            this.ctx.arc(x, y, cellRadius, 0, 2 * Math.PI);
+                            this.ctx.fill();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Global functions
+        let visualizer;
+
+        function resetView() {
+            if (visualizer) {
+                visualizer.transform = { scale: 1, translateX: 0, translateY: 0, rotation: 0 };
+            }
+        }
+
+        function changeMode() {
+            const mode = document.getElementById('visualMode').value;
+            if (visualizer) {
+                visualizer.visualMode = mode;
+                document.getElementById('currentMode').textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+            }
+        }
+
+        function toggleAnimation() {
+            if (visualizer) {
+                visualizer.isAnimating = !visualizer.isAnimating;
+            }
+        }
+
+        // Socket.IO connections
+        socket.on('connect', function() {
+            console.log('HDGL Lattice Visualizer connected!');
+        });
+
+        socket.on('network_data', function(data) {
+            console.log('Lattice data received:', data);
+            if (visualizer) {
+                visualizer.updateNetworkData(data);
+            }
+        });
+
+        // Initialize visualizer
+        document.addEventListener('DOMContentLoaded', function() {
+            visualizer = new HDGLLatticeVisualizer();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+ipfshttpclient
+web3
+mpmath
+smbus2
+numpy
+requests
+
+# Notes:
+# - If the Docker build fails installing `web3`/`cryptography` due to missing build deps,
+#   add system packages: build-essential, libssl-dev, libffi-dev, python3-dev (or adjust Dockerfile).

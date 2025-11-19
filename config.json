@@ -1,0 +1,11 @@
+{
+  "eth_rpc": "http://eth-node:8545",
+  "eth_contract": "0x0000000000000000000000000000000000000000",
+  "eth_private_key": "YOUR_ETH_PRIVATE_KEY",
+  "poll_interval": 5,
+  "auto_evolve": true,
+  "tm_tape_size": 5,
+  "checkpoint_interval": 100,
+  "ipfs_endpoint": "http://ipfs:5001",
+  "bridge_data_port": 9999
+}

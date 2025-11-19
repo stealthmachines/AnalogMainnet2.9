@@ -1,0 +1,75 @@
+version: "2"
+services:
+  rpc-node:
+    build: geth-client
+    restart: on-failure
+    container_name: rpc-node
+    hostname: rpc-node
+    entrypoint: bash /root/start.sh
+    command: "--datadir=/root/.chargnet --config /root/config.toml --port=22177 --networkid=22177 --http --http.api=personal,db,eth,net,web3,txpool,tx,admin --http.corsdomain=* --http.vhosts=*,host.docker.internal --http.addr=127.0.0.1 --authrpc.vhosts=* --ws --ws.addr 127.0.0.1 --cache=512 --verbosity 5"
+    volumes:
+      - ./files/rpc-node:/root/.chargnet:rw
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "22177:22177"
+      - "22177:22177/udp"
+      - "8555:8545"
+      - "8556:8546"
+  miner1:
+    build: geth-client
+    restart: on-failure
+    container_name: miner1
+    hostname: miner1
+    depends_on:
+      - rpc-node
+    entrypoint: bash /root/start.sh
+    command: "--datadir=/root/.chargnet --config /root/config.toml --port=22171 --networkid=22177 --unlock 0x0000000000000000000000000000000000000000 --password /root/pass.txt --mine --miner.etherbase 0x0000000000000000000000000000000000000000 --http --http.api=personal,eth,net,web3,txpool,admin --http.vhosts=*,host.docker.internal --http.addr=127.0.0.1 --cache=512 --allow-insecure-unlock --verbosity 5"
+    volumes:
+      - ./files/node1:/root/.chargnet:rw
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "22171:22171"
+      - "22171:22171/udp"
+      - "8557:8545"
+  miner2:
+    build: geth-client
+    restart: on-failure
+    container_name: miner2
+    hostname: miner2
+    depends_on:
+      - rpc-node
+    entrypoint: bash /root/start.sh
+    command: "--datadir=/root/.chargnet --config /root/config.toml --port=22172 --networkid=22177 --unlock 0x0000000000000000000000000000000000000000 --password /root/pass.txt --mine --miner.etherbase 0x0000000000000000000000000000000000000000 --http --http.api=personal,eth,net,web3,txpool,admin --http.vhosts=*,host.docker.internal --http.addr=127.0.0.1 --cache=512 --allow-insecure-unlock --verbosity 5"
+    volumes:
+      - ./files/node2:/root/.chargnet:rw
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "22172:22172"
+      - "22172:22172/udp"
+      - "8558:8545"
+
+
+
+# version: "2"
+# services:
+#   rpc-node:
+#     build: geth-client
+#     restart: on-failure
+#     container_name: rpc-node
+#     hostname: rpc-node
+#     entrypoint: bash /root/start.sh
+#     command: "--datadir=~/.chargnet --config /root/config.toml --port=22177 --networkid=22177 --bootnodes YOUR_ENODE_KEY@127.0.0.1:YOUR_PORT@miner1:22171,YOUR_ENODE_KEY@127.0.0.1:YOUR_PORT@miner2:22172,YOUR_ENODE_KEY@127.0.0.1:YOUR_PORT@rpc-node:22177 --unlock 0x0000000000000000000000000000000000000000 --password /root/pass.txt --mine --miner.etherbase 0x0000000000000000000000000000000000000000 --http --http.api=personal,eth,net,web3,txpool,admin --http.addr=127.0.0.1 --cache=512 --nodiscover"
+#   miner2:
+#     build: geth-client
+#     restart: on-failure
+#     links:
+#       - rpc-node
+#     entrypoint: bash /root/start.sh
+#     volumes:
+#       - ./files/node2:/root/.chargnet:rw
+#       - /etc/localtime:/etc/localtime:ro
+#     ports:
+#       - "22172:22172"
+#       - "22172:22172/udp"
+#       - "8548:8545"
+#     command: "--datadir=~/.chargnet --config /root/config.toml --port=22172 --networkid=22177 --bootnodes YOUR_ENODE_KEY@127.0.0.1:YOUR_PORT@miner1:22171,YOUR_ENODE_KEY@127.0.0.1:YOUR_PORT

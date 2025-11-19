@@ -1,0 +1,8 @@
+{
+  "eth_rpc": "http://localhost:8545",
+  "eth_contract": "0xYourContractAddress",
+  "poll_interval": 30,
+  "auto_evolve": true,
+  "tm_tape_size": 5,
+  "checkpoint_interval": 100
+}

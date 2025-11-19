@@ -1,0 +1,66 @@
+services:
+  hdgl-bridge:
+    build: .
+    profiles:
+      - all
+      - bridge
+    ports:
+      - "9999:9999"  # Bridge API port
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ETH_PRIVATE_KEY=${ETH_PRIVATE_KEY}
+      - SERVICE_TYPE=bridge
+    depends_on:
+      - ipfs
+      - eth-node
+    restart: unless-stopped
+
+  hdgl-web:
+    build: .
+    profiles:
+      - all
+      - webhost
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./static:/app/static
+      - ./templates:/app/templates
+    environment:
+      - SERVICE_TYPE=web
+    command: ["python", "web_services.py"]
+    restart: unless-stopped
+
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    profiles:
+      - all
+      - ipfs
+    ports:
+      - "5001:5001"
+      - "8081:8080"  # Changed to avoid conflict with web service
+      - "4001:4001"  # Swarm port
+    volumes:
+      - ipfs-data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    command:
+      - "daemon"
+      - "--enable-pubsub-experiment"
+
+  eth-node:
+    image: ethereum/client-go:latest
+    command: --http --http.addr 127.0.0.1 --http.api eth,net,web3
+    ports:
+      - "8545:8545"
+    volumes:
+      - eth-data:/root/.ethereum
+
+volumes:
+  ipfs-data:
+  eth-data:
+
+networks:
+  default:
+    name: hdgl_network
+    external: true

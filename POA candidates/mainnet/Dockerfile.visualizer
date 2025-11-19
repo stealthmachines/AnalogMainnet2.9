@@ -1,0 +1,46 @@
+# Use Node.js for WebGL visualization
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    make \
+    g++ \
+    gcc \
+    git \
+    python3-dev \
+    musl-dev \
+    linux-headers \
+    curl
+
+# Set up Python virtual environment
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Copy package files
+COPY package*.json ./
+COPY requirements.txt ./
+
+# Install node dependencies
+RUN npm install three.js socket.io express gl-matrix
+
+# Install Python dependencies
+RUN . /app/venv/bin/activate && pip3 install --no-cache-dir -r requirements.txt
+
+# Set up directories
+RUN mkdir -p /app/templates/visualizer /app/static/visualizer
+
+# Copy all application files
+COPY . .
+
+# Generate templates
+RUN node generate_static.js
+
+# Expose the visualizer port
+EXPOSE 8080
+
+# Start the visualizer server
+CMD ["node", "visualizer_server.js"]

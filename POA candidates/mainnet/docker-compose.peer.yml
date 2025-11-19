@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  hdgl-bridge:
+    build: .
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ETH_PRIVATE_KEY=${ETH_PRIVATE_KEY}
+      - PEER_MODE=true  # Enable peer mode
+    depends_on:
+      - ipfs
+      - eth-node
+    restart: unless-stopped
+
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    ports:
+      - "5002:5001"  # Different port for peer
+      - "8081:8080"  # Different gateway port
+      - "4003:4001"  # Swarm port
+    volumes:
+      - ipfs-peer-data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    command:
+      - "daemon"
+      - "--enable-pubsub-experiment"
+
+  eth-node:
+    image: ethereum/client-go:latest
+    command: >
+      --http
+      --http.addr 127.0.0.1
+      --http.api eth,net,web3
+      --http.port 8546
+      --port 30304
+      --bootnodes YOUR_ENODE_KEY@127.0.0.1:YOUR_PORT

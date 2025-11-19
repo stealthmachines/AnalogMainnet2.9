@@ -1,0 +1,69 @@
+{
+  "deployment_config": {
+    "description": "HDGL Analog Mainnet Deployment Configuration Template",
+    "version": "1.0",
+    "instructions": "Replace all YOUR_* placeholders with your actual values before deployment",
+    "placeholders": {
+      "network": {
+        "ip_address": "127.0.0.1",
+        "rpc_url": "http://localhost:8545",
+        "ipfs_endpoint": "http://localhost:5001",
+        "websocket_port": "YOUR_WEBSOCKET_PORT"
+      },
+      "ethereum": {
+        "private_key": "",
+        "contract_address": "0x0000000000000000000000000000000000000000",
+        "chain_id": "YOUR_CHAIN_ID"
+      },
+      "security": {
+        "admin_password": "YOUR_PASSWORD",
+        "jwt_secret": "YOUR_JWT_SECRET",
+        "api_key": "YOUR_API_KEY"
+      },
+      "database": {
+        "connection_string": "YOUR_DATABASE_URL",
+        "username": "YOUR_DB_USER",
+        "password": "YOUR_PASSWORD"
+      },
+      "services": {
+        "bridge_port": "YOUR_BRIDGE_PORT",
+        "web_port": "YOUR_WEB_PORT",
+        "explorer_port": "YOUR_EXPLORER_PORT"
+      }
+    },
+    "example_values": {
+      "network": {
+        "ip_address": "127.0.0.1",
+        "rpc_url": "http://localhost:8545",
+        "ipfs_endpoint": "http://localhost:5001",
+        "websocket_port": "8080"
+      },
+      "ethereum": {
+        "private_key": "",
+        "contract_address": "0x0000000000000000000000000000000000000000",
+        "chain_id": "1337"
+      },
+      "security": {
+        "admin_password": "YOUR_PASSWORD",
+        "jwt_secret": "your_jwt_secret_key_here",
+        "api_key": "YOUR_API_KEY"
+      },
+      "database": {
+        "connection_string": "postgresql://user:password@localhost:5432/hdgl_db",
+        "username": "hdgl_user",
+        "password": "YOUR_PASSWORD"
+      },
+      "services": {
+        "bridge_port": "9999",
+        "web_port": "8080",
+        "explorer_port": "3000"
+      }
+    },
+    "validation_rules": {
+      "ip_address": "^\\d+\\.\\d+\\.\\d+\\.\\d+$",
+      "private_key": "^[a-fA-F0-9]{64}$",
+      "contract_address": "^0x[a-fA-F0-9]{40}$",
+      "port": "^\\d+$"
+    }
+  }
+}

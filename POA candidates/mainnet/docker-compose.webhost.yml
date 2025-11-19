@@ -1,0 +1,90 @@
+services:
+  stats:
+    build:
+      context: .
+      dockerfile: Dockerfile.stats
+    container_name: hdgl_stats_v2
+    ports:
+      - "8547-8647:8080"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  explorer:
+    build:
+      context: .
+      dockerfile: Dockerfile.explorer
+    container_name: hdgl_explorer_v2
+    ports:
+      - "8648-8748:8080"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  visualizer:
+    build:
+      context: .
+      dockerfile: Dockerfile.visualizer
+    container_name: hdgl_visualizer_v2
+    ports:
+      - "8749-8849:8080"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  program:
+    build:
+      context: .
+      dockerfile: Dockerfile.program
+    container_name: hdgl_program_v2
+    ports:
+      - "8850-8950:8080"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    container_name: hdgl_ipfs_v2
+    volumes:
+      - ./data:/data/ipfs
+    ports:
+      - "4013:4001"
+      - "5012:5001"
+      - "8091:8080"
+    healthcheck:
+      test: ["CMD", "ipfs", "id"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+networks:
+  default:
+    name: hdgl_network_v2
+    external: true

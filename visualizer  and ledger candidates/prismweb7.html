@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>HDGL Superglyphs — Infinite Prismatic Engine</title>
+<style>
+html, body { margin:0; height:100%; background:#0b0b0f; overflow:hidden; font-family:monospace; }
+#ui { position:fixed; left:12px; top:12px; z-index:20; display:flex; flex-wrap:wrap; gap:8px; }
+#ui input, #ui button { padding:6px; border-radius:6px; border:1px solid #222; background:#111; color:#ffd700; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <label>Slots: <input id="numSlots" type="number" value="2048" min="128" max="8192" step="128"></label>
+  <label>Layers: <input id="numLayers" type="number" value="8" min="1" max="64" step="1"></label>
+  <label>Strands: <input id="numStrands" type="number" value="8" min="1" max="16" step="1"></label>
+  <label>Zoom: <input id="zoom" type="number" value="0.22" step="0.01"></label>
+  <button id="regen">Regenerate</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+// ---------- Globals ----------
+let scene, camera, renderer, controls, points;
+let material, geometry;
+let t = 0;
+
+// UI Elements
+const numSlotsEl = document.getElementById('numSlots');
+const numLayersEl = document.getElementById('numLayers');
+const numStrandsEl = document.getElementById('numStrands');
+const zoomEl = document.getElementById('zoom');
+const regenBtn = document.getElementById('regen');
+
+// ---------- Init Scene ----------
+function initScene() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 10000);
+    camera.position.set(0,0,300);
+    renderer = new THREE.WebGLRenderer({antialias:false});
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+
+    scene.add(new THREE.AmbientLight(0x222222));
+    scene.add(new THREE.PointLight(0xffd700, 1.5, 2000));
+
+    window.addEventListener('resize', ()=>{
+        camera.aspect = innerWidth/innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+    });
+}
+
+// ---------- Shader Material ----------
+function createMaterial() {
+    const vertexShader = `
+    uniform float time;
+    uniform float numSlots;
+    uniform float numLayers;
+    uniform float numStrands;
+    uniform float zoom;
+
+    varying float vDepth;
+    varying float vLayerAlpha;
+    varying vec3 vColor;
+
+    void main(){
+        float i = float(gl_VertexID % int(numSlots));
+        float layerID = float(gl_VertexID / int(numSlots) % int(numLayers));
+        float strandID = float(gl_VertexID / int(numSlots*numLayers) % int(numStrands));
+
+        float phi = 1.6180339887;
+        float theta = i*6.283185307/phi + strandID*0.314159;
+        float rBase = sqrt(mod(i+1.0,numSlots))*zoom*10.0;
+
+        float r = rBase*(1.0+0.05*layerID*sin(time*0.5 + i*0.001));
+        float z = mod(i,numSlots/2.0)*0.05 - 50.0 + layerID*5.0*sin(time*0.3 + i*0.002);
+
+        vec3 pos = vec3(
+            r*cos(theta + time*0.05*(layerID+1.0)),
+            r*sin(theta + time*0.05*(layerID+1.0)),
+            z
+        );
+
+        vDepth = log(1.0 + length(pos));
+        vLayerAlpha = 1.0 - layerID/numLayers;
+        vColor = vec3(
+            0.5 + 0.5*sin(strandID + time),
+            0.5 + 0.5*cos(strandID + time*0.7),
+            0.5 + 0.5*sin(strandID*1.3 + time)
+        );
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
+        gl_PointSize = 2.0 + 3.0/(0.001+vDepth/5.0) * vLayerAlpha;
+    }
+    `;
+
+    const fragmentShader = `
+    varying float vDepth;
+    varying float vLayerAlpha;
+    varying vec3 vColor;
+
+    void main(){
+        float blurFactor = smoothstep(1.0, 6.0, vDepth);
+        float alpha = vLayerAlpha * (1.0 - blurFactor);
+        gl_FragColor = vec4(vColor, alpha);
+    }
+    `;
+
+    material = new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        uniforms: {
+            time: { value: 0 },
+            numSlots: { value: parseFloat(numSlotsEl.value) },
+            numLayers: { value: parseFloat(numLayersEl.value) },
+            numStrands: { value: parseFloat(numStrandsEl.value) },
+            zoom: { value: parseFloat(zoomEl.value) }
+        },
+        transparent:true,
+        depthTest:true
+    });
+}
+
+// ---------- Geometry ----------
+function createGeometry() {
+    const totalVertices = parseInt(numSlotsEl.value)*parseInt(numLayersEl.value)*parseInt(numStrandsEl.value);
+    geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(totalVertices*3);
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+}
+
+// ---------- Build Points ----------
+function buildPoints() {
+    if(points){
+        scene.remove(points);
+        geometry.dispose();
+        points.material.dispose();
+    }
+    createGeometry();
+    createMaterial();
+    points = new THREE.Points(geometry, material);
+    scene.add(points);
+}
+
+// ---------- UI Events ----------
+regenBtn.addEventListener('click', buildPoints);
+numSlotsEl.addEventListener('change', ()=>{ material.uniforms.numSlots.value = parseFloat(numSlotsEl.value); buildPoints(); });
+numLayersEl.addEventListener('change', ()=>{ material.uniforms.numLayers.value = parseFloat(numLayersEl.value); buildPoints(); });
+numStrandsEl.addEventListener('change', ()=>{ material.uniforms.numStrands.value = parseFloat(numStrandsEl.value); buildPoints(); });
+zoomEl.addEventListener('input', ()=>{ material.uniforms.zoom.value = parseFloat(zoomEl.value); });
+
+// ---------- Animate ----------
+function animate() {
+    requestAnimationFrame(animate);
+    t += 0.02;
+    material.uniforms.time.value = t;
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+// ---------- Init ----------
+initScene();
+buildPoints();
+animate();
+</script>
+</body>
+</html>

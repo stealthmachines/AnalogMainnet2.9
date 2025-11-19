@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  hdgl-bridge:
+    build: .
+    volumes:
+      - ./data:/app/data
+      # Note: hardware I2C device mapping (/dev/i2c-1) is Linux-only and
+      # causes errors on Windows hosts. To enable I2C on a Linux host,
+      # run docker compose with the optional override file:
+      #   docker compose -f docker-compose.yml -f docker-compose.i2c.yml up
+    # Device mappings removed from the main compose to keep it cross-platform.
+    # Use the optional override file `docker-compose.i2c.yml` on Linux hosts
+    # to add `devices:` entries.
+    environment:
+      - ETH_PRIVATE_KEY=${ETH_PRIVATE_KEY}
+    depends_on:
+      - ipfs
+      - eth-node
+    restart: unless-stopped
+
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    ports:
+      - "5001:5001"
+      - "8080:8080"
+      - "4001:4001"  # Swarm port
+    volumes:
+      - ipfs-data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    command:
+      - "daemon"
+      - "--enable-pubsub-experiment"
+
+  eth-node:
+    image: ethereum/client-go:latest
+    command: --http --http.addr 127.0.0.1 --http.api eth,net,web3
+    ports:
+      - "8545:8545"
+    volumes:
+      - eth-data:/root/.ethereum
+
+volumes:
+  ipfs-data:
+  eth-data:
+
+networks:
+  default:
+    name: hdgl_network
+    external: true

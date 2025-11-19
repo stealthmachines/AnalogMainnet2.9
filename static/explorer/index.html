@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HDGL Network Explorer</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .hash {
+            font-family: monospace;
+            word-break: break-all;
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.confirmed { background: #e6ffe6; color: #006600; }
+        .status.pending { background: #fff3e6; color: #cc7700; }
+    </style>
+</head>
+<body>
+    <h1>HDGL Network Explorer</h1>
+    <div class="card">
+        <h2>Latest State</h2>
+        <div id="latestState">
+            <p>Loading...</p>
+        </div>
+    </div>
+    <div class="card">
+        <h2>Recent Commitments</h2>
+        <div id="commitments">
+            <p>Loading...</p>
+        </div>
+    </div>
+    <div class="card">
+        <h2>IPFS Snapshots</h2>
+        <div id="snapshots">
+            <p>Loading...</p>
+        </div>
+    </div>
+    <script>
+        const socket = io('/explorer');
+
+        socket.on('connect', function() {
+            console.log('Explorer connected to /explorer namespace');
+        });
+
+        socket.on('state_update', function(data) {
+            console.log('State update received:', data);
+            document.getElementById('latestState').innerHTML = `
+                <p><strong>Block Height:</strong> ${data.blockHeight}</p>
+                <p><strong>State Hash:</strong> <span class="hash">${data.stateHash}</span></p>
+                <p><strong>Evolution Count:</strong> ${data.evolution_count || 0}</p>
+                <p><strong>Phase Variance:</strong> ${(data.phase_variance || 0).toFixed(6)}</p>
+                <p><strong>Consensus:</strong> ${data.consensus_locked ? 'Locked' : 'Unlocked'}</p>
+                <p><strong>Last Updated:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
+            `;
+        });
+
+        socket.on('commitments_update', function(data) {
+            console.log('Commitments update received:', data);
+            document.getElementById('commitments').innerHTML = data.commitments
+                .map(c => `
+                    <div style="margin-bottom: 15px;">
+                        <p>
+                            <span class="status ${c.confirmed ? 'confirmed' : 'pending'}">
+                                ${c.confirmed ? 'Confirmed' : 'Pending'}
+                            </span>
+                        </p>
+                        <p class="hash">${c.hash}</p>
+                        <small>${new Date(c.timestamp).toLocaleString()}</small>
+                    </div>
+                `).join('');
+        });
+
+        socket.on('snapshots_update', function(data) {
+            console.log('Snapshots update received:', data);
+            document.getElementById('snapshots').innerHTML = data.snapshots
+                .map(s => `
+                    <div style="margin-bottom: 15px;">
+                        <p><strong>CID:</strong> <span class="hash">${s.cid}</span></p>
+                        <p><strong>Height:</strong> ${s.height}</p>
+                        <small>${new Date(s.timestamp).toLocaleString()}</small>
+                    </div>
+                `).join('');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  hdgl-bridge:
+    devices:
+      - "/dev/i2c-1:/dev/i2c-1"
+    privileged: true
+    environment:
+      - USE_I2C=1

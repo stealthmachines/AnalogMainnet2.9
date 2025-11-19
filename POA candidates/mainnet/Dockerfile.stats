@@ -1,0 +1,43 @@
+# Use Node.js base for the stats dashboard
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies for real-time metrics
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    make \
+    g++ \
+    gcc \
+    python3-dev \
+    musl-dev \
+    linux-headers \
+    curl
+
+# Set up Python virtual environment
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Copy package files
+COPY package*.json ./
+COPY requirements.txt ./
+
+# Install both Node and Python dependencies
+RUN npm install chart.js socket.io express
+RUN . /app/venv/bin/activate && pip3 install --no-cache-dir -r requirements.txt
+
+# Create necessary directories
+RUN mkdir -p /app/static /app/templates
+
+# Copy source and generator files
+COPY . .
+
+# Generate static files and templates
+RUN node generate_static.js
+
+# Expose the stats port
+EXPOSE 8080
+
+# Start the stats server
+CMD ["node", "stats_server.js"]

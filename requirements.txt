@@ -1,0 +1,14 @@
+ipfshttpclient
+web3
+mpmath
+smbus2
+numpy
+requests
+flask
+flask-cors
+flask-socketio==5.3.6
+python-socketio==5.9.0
+
+# Notes:
+# - If the Docker build fails installing `web3`/`cryptography` due to missing build deps,
+#   add system packages: build-essential, libssl-dev, libffi-dev, python3-dev (or adjust Dockerfile).

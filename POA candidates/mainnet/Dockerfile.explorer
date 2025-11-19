@@ -1,0 +1,53 @@
+# Use Python base for IPFS/Ethereum interaction
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    python3-dev \
+    linux-headers-generic \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Set up Python virtual environment
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Install dependencies in virtual environment
+RUN . /app/venv/bin/activate && pip install --no-cache-dir -r requirements.txt
+
+# Additional explorer dependencies
+RUN pip install --no-cache-dir \
+    flask \
+    flask-socketio \
+    web3 \
+    'ipfshttpclient==0.7.0'
+
+# Install Node.js for template generation
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up template directories
+RUN mkdir -p /app/templates/explorer /app/static/explorer
+
+# Copy all application files
+COPY . .
+
+# Generate templates
+RUN node generate_static.js
+
+# Expose the explorer port
+EXPOSE 8080
+
+# Start the explorer server
+CMD ["python", "explorer_server.py"]
