@@ -34,6 +34,7 @@ This version is probably a stepping-stone to the preferred v3.0 which does not r
 - **Input Validation**: Comprehensive sanitization and bounds checking
 - **Security Audit**: Grade A security with documented recommendations
 - **Error Handling**: Graceful degradation and proper error responses
+- **Safe Deployment**: Placeholder-based configuration with deployment tools
 
 ### ⚡ Performance Metrics
 - **Web Services**: 30.9ms average response time (Grade A)
@@ -46,7 +47,7 @@ This version is probably a stepping-stone to the preferred v3.0 which does not r
 ### Prerequisites
 - **Docker & Docker Compose**
 - **Node.js** (for static file generation)
-- **Python 3.8+** (for local development)
+- **Python 3.8+** (for local development and deployment tools)
 - **Git** (for version control)
 
 ### Launch System (Windows)
@@ -91,6 +92,73 @@ curl -X POST http://localhost:8555 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
+
+## 🔐 Safe Deployment & Configuration
+
+### Deployment Tools Overview
+
+HDGL Analog Mainnet includes comprehensive deployment tools for secure configuration management:
+
+- **`deploy_config.py`** - Interactive deployment configuration tool
+- **`update_config.py`** - Configuration sanitizer for placeholder replacement
+- **`deployment-config.template.json`** - Template with all configuration options
+
+### Secure Deployment Process
+
+**Step 1: Interactive Configuration**
+```bash
+# Populate placeholders with real values interactively
+python deploy_config.py --interactive
+```
+
+**Step 2: Verify Configuration**
+```bash
+# Scan for any remaining placeholders
+python deploy_config.py --scan-only
+```
+
+**Step 3: Sanitize for Distribution (Optional)**
+```bash
+# Replace sensitive data with placeholders for safe sharing
+python update_config.py --sanitize --backup
+```
+
+### Configuration Templates
+
+The system uses placeholder-based configuration for security:
+
+```json
+{
+  "network": {
+    "ip_address": "YOUR_IP_ADDRESS",
+    "rpc_port": "YOUR_RPC_PORT"
+  },
+  "ethereum": {
+    "private_key": "YOUR_PRIVATE_KEY",
+    "contract_address": "0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"
+  },
+  "security": {
+    "api_key": "YOUR_API_KEY",
+    "jwt_secret": "YOUR_JWT_SECRET"
+  }
+}
+```
+
+### Deployment Security Best Practices
+
+1. **Never commit real credentials** - Use placeholders in version control
+2. **Use environment variables** for sensitive data in production
+3. **Create backups** before making configuration changes
+4. **Test configurations** in staging environments first
+5. **Audit configurations** regularly for exposed secrets
+
+### Configuration File Types Supported
+
+The deployment tools handle multiple configuration formats:
+- **JSON files** (`.json`) - Primary configuration format
+- **TOML files** (`.toml`) - Geth and node configurations
+- **YAML files** (`.yaml`, `.yml`) - Docker Compose configurations
+- **Config files** (`.config`, `.conf`) - System configurations
 
 ## 🏗️ Architecture
 
