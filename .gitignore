@@ -46,3 +46,7 @@ docker-data/
 
 # IPFS
 .ipfs/
+
+# Backup directories
+config_backup/
+config_backup*/
