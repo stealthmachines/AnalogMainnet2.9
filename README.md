@@ -12,7 +12,7 @@
 
 HDGL Analog Mainnet is a nearly production-ready distributed computing platform (candidate) that combines continuous analog physics simulation with discrete digital computation and blockchain consensus. The system provides a comprehensive three-layer architecture for hybrid analog-digital processing with distributed state validation, complete web interface suite, and enterprise-grade security features.
 
-This version is probably the stepping-stone to the preferred v3.0 which does not require POA to function.
+This version is probably the stepping-stone to the preferred v3.0 which does not require POA (~5-10 second blocktimes and ballooning ledger) to function.
 
 ### Core Architecture: Three-Layer Computing Stack
 
